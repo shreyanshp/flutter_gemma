@@ -5,28 +5,22 @@
 Pod::Spec.new do |s|
   s.name             = 'flutter_gemma'
   s.version          = '0.13.2'
-  s.summary          = 'Flutter plugin for running Gemma AI models locally with Gemma 3 Nano support.'
+  s.summary          = 'Flutter plugin for running Gemma AI models locally.'
   s.description      = <<-DESC
 The plugin allows running the Gemma AI model locally on a device from a Flutter application.
-Includes support for Gemma 3 Nano models with optimized MediaPipe GenAI v0.10.33.
+NOTE: This is a slim fork that removes all native iOS dependencies (MediaPipe, TFLite)
+to work around Xcode 26 linker bugs. AI inference is handled on Android/macOS; on iOS
+the plugin compiles but inference methods return errors gracefully.
                        DESC
-  s.homepage         = 'https://github.com/DenisovAV/flutter_gemma'
+  s.homepage         = 'https://github.com/shreyanshp/flutter_gemma'
   s.license          = { :file => '../LICENSE' }
   s.author           = { 'Flutter Berlin' => 'flutter@flutterberlin.dev' }
   s.source           = { :path => '.' }
   s.source_files = 'Classes/*.swift'
   s.dependency 'Flutter'
-  s.dependency 'MediaPipeTasksGenAI', '= 0.10.33'
-  s.dependency 'MediaPipeTasksGenAIC', '= 0.10.33'
-  # All TensorFlowLite deps removed — nightly builds have broken simulator
-  # support (SelectTfOps: no sim slice, TFLiteSwift: broken module precomp,
-  # TFLiteC: linker dylibToOrdinal crash). MediaPipe GenAI pods are sufficient
-  # for LLM chat inference. TFLite is only needed for embedding models.
-  # Previously:
-  # - SelectTfOps has no simulator slices (device-only)
-  # - TFLiteSwift nightly has broken module precompilation on Apple Silicon sim
-  # - EmbeddingModel.swift is guarded with #if !targetEnvironment(simulator)
-  # - Consumers add these pods directly in their Podfile for device builds
+  # MediaPipe and TFLite dependencies removed due to Xcode 26 linker
+  # dylibToOrdinal crash with static XCFrameworks. All inference code
+  # is guarded with #if canImport() so the plugin compiles as a no-op.
   s.platform = :ios, '16.0'
 
   s.pod_target_xcconfig = {

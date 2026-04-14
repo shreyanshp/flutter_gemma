@@ -47,14 +47,27 @@ public class FlutterGemmaPlugin: NSObject, FlutterPlugin {
 
 class PlatformServiceImpl : NSObject, PlatformService, FlutterStreamHandler {
     private var eventSink: FlutterEventSink?
+
+    // When MediaPipe is available (Android builds via Gradle, or future Xcode fix),
+    // the full inference implementation is used. When not available (current Xcode 26
+    // linker bug), all methods return "not available" errors so the app still builds.
+    #if canImport(MediaPipeTasksGenAI)
     private var model: InferenceModel?
     private var session: InferenceSession?
+    private var _hasMediaPipe: Bool { true }
+    #else
+    private var _hasMediaPipe: Bool { false }
+    #endif
 
     // Embedding model (like Android EmbeddingModel — no wrapper)
     // Device-only: TFLite has no simulator support
     #if canImport(TensorFlowLite)
     private var embeddingModel: EmbeddingModel?
     #endif
+
+    private func _notAvailableError() -> Error {
+        PigeonError(code: "MediaPipeNotAvailable", message: "AI inference not available on this platform (Xcode 26 linker limitation)", details: nil)
+    }
 
     func createModel(
         maxTokens: Int64,
@@ -65,6 +78,7 @@ class PlatformServiceImpl : NSObject, PlatformService, FlutterStreamHandler {
         supportAudio: Bool?,
         completion: @escaping (Result<Void, any Error>) -> Void
     ) {
+        #if canImport(MediaPipeTasksGenAI)
         DispatchQueue.global(qos: .userInitiated).async {
             do {
                 self.model = try InferenceModel(
@@ -75,19 +89,20 @@ class PlatformServiceImpl : NSObject, PlatformService, FlutterStreamHandler {
                     preferredBackend: preferredBackend,
                     supportAudio: supportAudio ?? false
                 )
-                DispatchQueue.main.async {
-                    completion(.success(()))
-                }
+                DispatchQueue.main.async { completion(.success(())) }
             } catch {
-                DispatchQueue.main.async {
-                    completion(.failure(error))
-                }
+                DispatchQueue.main.async { completion(.failure(error)) }
             }
         }
+        #else
+        completion(.failure(_notAvailableError()))
+        #endif
     }
 
     func closeModel(completion: @escaping (Result<Void, any Error>) -> Void) {
+        #if canImport(MediaPipeTasksGenAI)
         model = nil
+        #endif
         completion(.success(()))
     }
 
@@ -103,6 +118,8 @@ class PlatformServiceImpl : NSObject, PlatformService, FlutterStreamHandler {
         enableThinking: Bool?,
         completion: @escaping (Result<Void, any Error>) -> Void
     ) {
+        #if canImport(MediaPipeTasksGenAI)
+
         guard let inference = model?.inference else {
             completion(.failure(PigeonError(code: "Inference model not created", message: nil, details: nil)))
             return
@@ -135,14 +152,26 @@ class PlatformServiceImpl : NSObject, PlatformService, FlutterStreamHandler {
                 }
             }
         }
+    
+        #else
+        completion(.failure(_notAvailableError()))
+        #endif
     }
 
     func closeSession(completion: @escaping (Result<Void, any Error>) -> Void) {
+        #if canImport(MediaPipeTasksGenAI)
+
         session = nil
         completion(.success(()))
+    
+        #else
+        completion(.failure(_notAvailableError()))
+        #endif
     }
 
     func sizeInTokens(prompt: String, completion: @escaping (Result<Int64, any Error>) -> Void) {
+        #if canImport(MediaPipeTasksGenAI)
+
         guard let session = session else {
             completion(.failure(PigeonError(code: "Session not created", message: nil, details: nil)))
             return
@@ -156,9 +185,15 @@ class PlatformServiceImpl : NSObject, PlatformService, FlutterStreamHandler {
                 DispatchQueue.main.async { completion(.failure(error)) }
             }
         }
+    
+        #else
+        completion(.failure(_notAvailableError()))
+        #endif
     }
 
     func addQueryChunk(prompt: String, completion: @escaping (Result<Void, any Error>) -> Void) {
+        #if canImport(MediaPipeTasksGenAI)
+
         guard let session = session else {
             completion(.failure(PigeonError(code: "Session not created", message: nil, details: nil)))
             return
@@ -172,10 +207,16 @@ class PlatformServiceImpl : NSObject, PlatformService, FlutterStreamHandler {
                 DispatchQueue.main.async { completion(.failure(error)) }
             }
         }
+    
+        #else
+        completion(.failure(_notAvailableError()))
+        #endif
     }
 
     // Add method for adding image
     func addImage(imageBytes: FlutterStandardTypedData, completion: @escaping (Result<Void, any Error>) -> Void) {
+        #if canImport(MediaPipeTasksGenAI)
+
         guard let session = session else {
             completion(.failure(PigeonError(code: "Session not created", message: nil, details: nil)))
             return
@@ -208,10 +249,16 @@ class PlatformServiceImpl : NSObject, PlatformService, FlutterStreamHandler {
                 }
             }
         }
+    
+        #else
+        completion(.failure(_notAvailableError()))
+        #endif
     }
 
     // Add audio input (supported since MediaPipe 0.10.33)
     func addAudio(audioBytes: FlutterStandardTypedData, completion: @escaping (Result<Void, any Error>) -> Void) {
+        #if canImport(MediaPipeTasksGenAI)
+
         guard let session = session else {
             completion(.failure(PigeonError(code: "Session not created", message: nil, details: nil)))
             return
@@ -229,9 +276,15 @@ class PlatformServiceImpl : NSObject, PlatformService, FlutterStreamHandler {
                 }
             }
         }
+    
+        #else
+        completion(.failure(_notAvailableError()))
+        #endif
     }
 
     func generateResponse(completion: @escaping (Result<String, any Error>) -> Void) {
+        #if canImport(MediaPipeTasksGenAI)
+
         guard let session = session else {
             completion(.failure(PigeonError(code: "Session not created", message: nil, details: nil)))
             return
@@ -245,10 +298,16 @@ class PlatformServiceImpl : NSObject, PlatformService, FlutterStreamHandler {
                 DispatchQueue.main.async { completion(.failure(error)) }
             }
         }
+    
+        #else
+        completion(.failure(_notAvailableError()))
+        #endif
     }
 
     @available(iOS 13.0, *)
     func generateResponseAsync(completion: @escaping (Result<Void, any Error>) -> Void) {
+        #if canImport(MediaPipeTasksGenAI)
+
         print("[PLUGIN LOG] generateResponseAsync called")
         guard let session = session, let eventSink = eventSink else {
             print("[PLUGIN LOG] Session or eventSink not created")
@@ -303,9 +362,15 @@ class PlatformServiceImpl : NSObject, PlatformService, FlutterStreamHandler {
                 }
             }
         }
+    
+        #else
+        completion(.failure(_notAvailableError()))
+        #endif
     }
 
     func stopGeneration(completion: @escaping (Result<Void, any Error>) -> Void) {
+        #if canImport(MediaPipeTasksGenAI)
+
         guard let session = session else {
             completion(.failure(PigeonError(code: "Session not created", message: nil, details: nil)))
             return
@@ -317,6 +382,10 @@ class PlatformServiceImpl : NSObject, PlatformService, FlutterStreamHandler {
         } catch {
             completion(.failure(error))
         }
+    
+        #else
+        completion(.failure(_notAvailableError()))
+        #endif
     }
 
     // MARK: - RAG Methods (iOS Implementation)

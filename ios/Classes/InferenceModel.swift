@@ -1,3 +1,4 @@
+#if canImport(MediaPipeTasksGenAI)
 import Foundation
 import MediaPipeTasksGenAI
 import MediaPipeTasksGenAIC
@@ -12,10 +13,7 @@ struct InferenceModel {
          preferredBackend: PreferredBackend? = nil,
          supportAudio: Bool = false) throws {
 
-        // Use modelPath directly - MediaPipe can handle bundle paths, Documents paths, etc.
-        // No need to transform the path - it's already correct from the caller
         let llmOptions = LlmInference.Options(modelPath: modelPath)
-
         llmOptions.maxTokens = maxTokens
         llmOptions.waitForWeightUploads = true
 
@@ -27,7 +25,6 @@ struct InferenceModel {
             llmOptions.maxImages = maxNumImages
         }
 
-        // Set preferred backend (exposed in MediaPipe 0.10.33)
         if let backend = preferredBackend {
             switch backend {
             case .gpu:
@@ -35,11 +32,10 @@ struct InferenceModel {
             case .cpu:
                 llmOptions.preferredBackend = .cpu
             case .npu:
-                break  // NPU not supported on iOS
+                break
             }
         }
 
-        // Enable audio modality if requested
         if supportAudio {
             llmOptions.enableAudioModality = true
         }
@@ -47,7 +43,6 @@ struct InferenceModel {
         self.inference = try LlmInference(options: llmOptions)
     }
 
-    // Access to metrics
     var metrics: LlmInference.Metrics {
         return inference.metrics
     }
@@ -81,14 +76,11 @@ final class InferenceSession {
         options.enableVisionModality = enableVisionModality
         options.enableAudioModality = enableAudioModality
 
-        // Initialize session with proper error handling for Gemma 3n
         do {
             let newSession = try LlmInference.Session(llmInference: inference, options: options)
-            // Force initial token processing to ensure input*pos is properly set
             _ = try newSession.sizeInTokens(text: " ")
             self.session = newSession
         } catch {
-            // Fallback: retry with minimal configuration for Gemma 3n compatibility
             let fallbackOptions = LlmInference.Session.Options()
             fallbackOptions.temperature = temperature
             fallbackOptions.randomSeed = randomSeed
@@ -126,13 +118,11 @@ final class InferenceSession {
         try session.cancelGenerateResponseAsync()
     }
 
-    // Clone session (GPU models only)
     func clone() throws -> InferenceSession {
         let clonedSession = try session.clone()
         return InferenceSession(wrapping: clonedSession)
     }
 
-    // Private initializer for wrapping existing session (used by clone)
     private init(wrapping session: LlmInference.Session) {
         self.session = session
     }
@@ -154,10 +144,8 @@ final class InferenceSession {
         return AsyncThrowingStream { continuation in
             Task {
                 do {
-                    var tokenCount = 0
                     var fullResponse = ""
                     for try await partialResult in session.generateResponseAsync() {
-                        tokenCount += 1
                         fullResponse += partialResult
                         continuation.yield(partialResult)
                     }
@@ -169,8 +157,8 @@ final class InferenceSession {
         }
     }
 
-    // Access to session metrics
     var metrics: LlmInference.Session.Metrics {
         return session.metrics
     }
 }
+#endif
