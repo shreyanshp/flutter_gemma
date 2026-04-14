@@ -18,8 +18,11 @@ Includes support for Gemma 3 Nano models with optimized MediaPipe GenAI v0.10.33
   s.dependency 'Flutter'
   s.dependency 'MediaPipeTasksGenAI', '= 0.10.33'
   s.dependency 'MediaPipeTasksGenAIC', '= 0.10.33'
-  s.dependency 'TensorFlowLiteC', '0.0.1-nightly.20250619'
-  # TensorFlowLiteSwift and TensorFlowLiteSelectTfOps removed:
+  # All TensorFlowLite deps removed — nightly builds have broken simulator
+  # support (SelectTfOps: no sim slice, TFLiteSwift: broken module precomp,
+  # TFLiteC: linker dylibToOrdinal crash). MediaPipe GenAI pods are sufficient
+  # for LLM chat inference. TFLite is only needed for embedding models.
+  # Previously:
   # - SelectTfOps has no simulator slices (device-only)
   # - TFLiteSwift nightly has broken module precompilation on Apple Silicon sim
   # - EmbeddingModel.swift is guarded with #if !targetEnvironment(simulator)
