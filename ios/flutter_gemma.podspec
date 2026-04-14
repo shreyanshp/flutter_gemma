@@ -8,9 +8,8 @@ Pod::Spec.new do |s|
   s.summary          = 'Flutter plugin for running Gemma AI models locally.'
   s.description      = <<-DESC
 The plugin allows running the Gemma AI model locally on a device from a Flutter application.
-NOTE: This is a slim fork that removes all native iOS dependencies (MediaPipe, TFLite)
-to work around Xcode 26 linker bugs. AI inference is handled on Android/macOS; on iOS
-the plugin compiles but inference methods return errors gracefully.
+Fork: Fixes Xcode 26 linker crash by removing -force_load and TFLite deps.
+MediaPipe GenAI is included for on-device LLM inference.
                        DESC
   s.homepage         = 'https://github.com/shreyanshp/flutter_gemma'
   s.license          = { :file => '../LICENSE' }
@@ -18,14 +17,18 @@ the plugin compiles but inference methods return errors gracefully.
   s.source           = { :path => '.' }
   s.source_files = 'Classes/*.swift'
   s.dependency 'Flutter'
-  # MediaPipe and TFLite dependencies removed due to Xcode 26 linker
-  # dylibToOrdinal crash with static XCFrameworks. All inference code
-  # is guarded with #if canImport() so the plugin compiles as a no-op.
+  s.dependency 'MediaPipeTasksGenAI', '= 0.10.33'
+  s.dependency 'MediaPipeTasksGenAIC', '= 0.10.33'
+  # TFLite deps removed — only needed for embedding models, not chat inference.
+  # Embedding code is guarded with #if canImport(TensorFlowLite).
   s.platform = :ios, '16.0'
 
   s.pod_target_xcconfig = {
     'DEFINES_MODULE' => 'YES',
     'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'i386',
+    # NO -force_load — this triggers the Xcode 26 ld_prime dylibToOrdinal crash.
+    # MediaPipe symbols are linked normally via the framework dependency.
+    # The standalone .a files are NOT force-loaded.
     'OTHER_LDFLAGS[sdk=iphonesimulator*]' => ''
   }
   s.swift_version = '5.0'
