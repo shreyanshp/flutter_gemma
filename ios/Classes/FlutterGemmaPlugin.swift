@@ -52,7 +52,7 @@ class PlatformServiceImpl : NSObject, PlatformService, FlutterStreamHandler {
 
     // Embedding model (like Android EmbeddingModel — no wrapper)
     // Device-only: TFLite has no simulator support
-    #if !targetEnvironment(simulator)
+    #if canImport(TensorFlowLite)
     private var embeddingModel: EmbeddingModel?
     #endif
 
@@ -324,7 +324,7 @@ class PlatformServiceImpl : NSObject, PlatformService, FlutterStreamHandler {
     // On simulator, all embedding methods return "not available" errors.
 
     func createEmbeddingModel(modelPath: String, tokenizerPath: String, preferredBackend: PreferredBackend?, completion: @escaping (Result<Void, Error>) -> Void) {
-        #if targetEnvironment(simulator)
+        #if !canImport(TensorFlowLite)
         completion(.failure(PigeonError(
             code: "SimulatorNotSupported",
             message: "Embedding models are not supported on iOS simulator",
@@ -367,7 +367,7 @@ class PlatformServiceImpl : NSObject, PlatformService, FlutterStreamHandler {
     }
     
     func closeEmbeddingModel(completion: @escaping (Result<Void, Error>) -> Void) {
-        #if targetEnvironment(simulator)
+        #if !canImport(TensorFlowLite)
         completion(.success(()))
         #else
         print("[PLUGIN] Closing embedding model")
@@ -383,7 +383,7 @@ class PlatformServiceImpl : NSObject, PlatformService, FlutterStreamHandler {
     }
     
     func generateEmbeddingFromModel(text: String, completion: @escaping (Result<[Double], Error>) -> Void) {
-        #if targetEnvironment(simulator)
+        #if !canImport(TensorFlowLite)
         completion(.failure(PigeonError(code: "SimulatorNotSupported", message: "Embeddings not supported on simulator", details: nil)))
         #else
         guard let embeddingModel = embeddingModel else {
@@ -402,7 +402,7 @@ class PlatformServiceImpl : NSObject, PlatformService, FlutterStreamHandler {
     }
 
     func generateDocumentEmbeddingFromModel(text: String, completion: @escaping (Result<[Double], Error>) -> Void) {
-        #if targetEnvironment(simulator)
+        #if !canImport(TensorFlowLite)
         completion(.failure(PigeonError(code: "SimulatorNotSupported", message: "Embeddings not supported on simulator", details: nil)))
         #else
         guard let embeddingModel = embeddingModel else {
@@ -421,7 +421,7 @@ class PlatformServiceImpl : NSObject, PlatformService, FlutterStreamHandler {
     }
 
     func generateEmbeddingsFromModel(texts: [String], completion: @escaping (Result<[Any?], Error>) -> Void) {
-        #if targetEnvironment(simulator)
+        #if !canImport(TensorFlowLite)
         completion(.failure(PigeonError(code: "SimulatorNotSupported", message: "Embeddings not supported on simulator", details: nil)))
         #else
         guard let embeddingModel = embeddingModel else {
@@ -441,7 +441,7 @@ class PlatformServiceImpl : NSObject, PlatformService, FlutterStreamHandler {
     }
 
     func getEmbeddingDimension(completion: @escaping (Result<Int64, Error>) -> Void) {
-        #if targetEnvironment(simulator)
+        #if !canImport(TensorFlowLite)
         completion(.failure(PigeonError(code: "SimulatorNotSupported", message: "Embeddings not supported on simulator", details: nil)))
         #else
         guard let embeddingModel = embeddingModel else {

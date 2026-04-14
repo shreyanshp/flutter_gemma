@@ -1,4 +1,4 @@
-#if !targetEnvironment(simulator)
+#if canImport(TensorFlowLite)
 import Foundation
 import TensorFlowLite
 
