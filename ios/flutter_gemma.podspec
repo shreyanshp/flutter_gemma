@@ -19,18 +19,18 @@ Includes support for Gemma 3 Nano models with optimized MediaPipe GenAI v0.10.33
   s.dependency 'MediaPipeTasksGenAI', '= 0.10.33'
   s.dependency 'MediaPipeTasksGenAIC', '= 0.10.33'
   s.dependency 'TensorFlowLiteC', '0.0.1-nightly.20250619'
-  s.dependency 'TensorFlowLiteSwift', '0.0.1-nightly.20250619'
-  s.dependency 'TensorFlowLiteSelectTfOps', '0.0.1-nightly.20250619'
+  # TensorFlowLiteSwift and TensorFlowLiteSelectTfOps removed:
+  # - SelectTfOps has no simulator slices (device-only)
+  # - TFLiteSwift nightly has broken module precompilation on Apple Silicon sim
+  # - EmbeddingModel.swift is guarded with #if !targetEnvironment(simulator)
+  # - Consumers add these pods directly in their Podfile for device builds
   s.platform = :ios, '16.0'
 
   s.pod_target_xcconfig = {
     'DEFINES_MODULE' => 'YES',
     'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'i386',
-    # Conditional force_load: only for device builds (TensorFlowLiteSelectTfOps doesn't have simulator slice)
     'OTHER_LDFLAGS[sdk=iphoneos*]' => '-force_load $(SRCROOT)/Pods/TensorFlowLiteSelectTfOps/Frameworks/TensorFlowLiteSelectTfOps.xcframework/ios-arm64/TensorFlowLiteSelectTfOps.framework/TensorFlowLiteSelectTfOps',
-    'OTHER_LDFLAGS[sdk=iphonesimulator*]' => '',
-    # Allow simulator builds to succeed with device-only TFLite deps
-    'SWIFT_ACTIVE_COMPILATION_CONDITIONS[sdk=iphonesimulator*]' => '$(inherited) SIMULATOR_BUILD'
+    'OTHER_LDFLAGS[sdk=iphonesimulator*]' => ''
   }
   s.swift_version = '5.0'
 end
