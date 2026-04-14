@@ -1,3 +1,4 @@
+#if !targetEnvironment(simulator)
 import Foundation
 import TensorFlowLite
 
@@ -319,4 +320,5 @@ extension EmbeddingModel {
         return try generateEmbedding(for: testText)
     }
 }
+#endif
 

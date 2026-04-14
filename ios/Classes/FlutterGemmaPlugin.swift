@@ -51,7 +51,10 @@ class PlatformServiceImpl : NSObject, PlatformService, FlutterStreamHandler {
     private var session: InferenceSession?
 
     // Embedding model (like Android EmbeddingModel — no wrapper)
+    // Device-only: TFLite has no simulator support
+    #if !targetEnvironment(simulator)
     private var embeddingModel: EmbeddingModel?
+    #endif
 
     func createModel(
         maxTokens: Int64,
@@ -317,20 +320,26 @@ class PlatformServiceImpl : NSObject, PlatformService, FlutterStreamHandler {
     }
 
     // MARK: - RAG Methods (iOS Implementation)
-    
+    // Embedding features require TensorFlowLite which has no simulator slices.
+    // On simulator, all embedding methods return "not available" errors.
+
     func createEmbeddingModel(modelPath: String, tokenizerPath: String, preferredBackend: PreferredBackend?, completion: @escaping (Result<Void, Error>) -> Void) {
+        #if targetEnvironment(simulator)
+        completion(.failure(PigeonError(
+            code: "SimulatorNotSupported",
+            message: "Embedding models are not supported on iOS simulator",
+            details: nil
+        )))
+        #else
         print("[PLUGIN] Creating embedding model")
         print("[PLUGIN] Model path: \(modelPath)")
         print("[PLUGIN] Tokenizer path: \(tokenizerPath)")
         print("[PLUGIN] Preferred backend: \(String(describing: preferredBackend))")
 
-        // Convert PreferredBackend to useGPU boolean
-        // Note: NPU not supported for embeddings on iOS
         let useGPU = preferredBackend == .gpu
 
         DispatchQueue.global(qos: .userInitiated).async {
             do {
-                // Create EmbeddingModel directly (like Android EmbeddingModel)
                 self.embeddingModel = EmbeddingModel(
                     modelPath: modelPath,
                     tokenizerPath: tokenizerPath,
@@ -354,155 +363,100 @@ class PlatformServiceImpl : NSObject, PlatformService, FlutterStreamHandler {
                 }
             }
         }
+        #endif
     }
     
     func closeEmbeddingModel(completion: @escaping (Result<Void, Error>) -> Void) {
+        #if targetEnvironment(simulator)
+        completion(.success(()))
+        #else
         print("[PLUGIN] Closing embedding model")
-
         DispatchQueue.global(qos: .userInitiated).async {
             self.embeddingModel?.close()
             self.embeddingModel = nil
-
             DispatchQueue.main.async {
                 print("[PLUGIN] Embedding model closed successfully")
                 completion(.success(()))
             }
         }
+        #endif
     }
     
     func generateEmbeddingFromModel(text: String, completion: @escaping (Result<[Double], Error>) -> Void) {
-        print("[PLUGIN] Generating embedding for text: \(text)")
-
+        #if targetEnvironment(simulator)
+        completion(.failure(PigeonError(code: "SimulatorNotSupported", message: "Embeddings not supported on simulator", details: nil)))
+        #else
         guard let embeddingModel = embeddingModel else {
-            completion(.failure(PigeonError(
-                code: "EmbeddingModelNotInitialized",
-                message: "Embedding model not initialized. Call createEmbeddingModel first.",
-                details: nil
-            )))
+            completion(.failure(PigeonError(code: "EmbeddingModelNotInitialized", message: "Embedding model not initialized.", details: nil)))
             return
         }
-
         DispatchQueue.global(qos: .userInitiated).async {
             do {
-                let floatEmbeddings = try embeddingModel.generateEmbedding(for: text)
-                let doubleEmbeddings = floatEmbeddings.map { Double($0) }
-
-                DispatchQueue.main.async {
-                    print("[PLUGIN] Generated embedding with \(doubleEmbeddings.count) dimensions")
-                    completion(.success(doubleEmbeddings))
-                }
+                let e = try embeddingModel.generateEmbedding(for: text)
+                DispatchQueue.main.async { completion(.success(e.map { Double($0) })) }
             } catch {
-                DispatchQueue.main.async {
-                    print("[PLUGIN] Failed to generate embedding: \(error)")
-                    completion(.failure(PigeonError(
-                        code: "EmbeddingGenerationFailed",
-                        message: "Failed to generate embedding: \(error.localizedDescription)",
-                        details: nil
-                    )))
-                }
+                DispatchQueue.main.async { completion(.failure(PigeonError(code: "EmbeddingGenerationFailed", message: error.localizedDescription, details: nil))) }
             }
         }
+        #endif
     }
 
     func generateDocumentEmbeddingFromModel(text: String, completion: @escaping (Result<[Double], Error>) -> Void) {
+        #if targetEnvironment(simulator)
+        completion(.failure(PigeonError(code: "SimulatorNotSupported", message: "Embeddings not supported on simulator", details: nil)))
+        #else
         guard let embeddingModel = embeddingModel else {
-            completion(.failure(PigeonError(
-                code: "EmbeddingModelNotInitialized",
-                message: "Embedding model not initialized. Call createEmbeddingModel first.",
-                details: nil
-            )))
+            completion(.failure(PigeonError(code: "EmbeddingModelNotInitialized", message: "Embedding model not initialized.", details: nil)))
             return
         }
-
         DispatchQueue.global(qos: .userInitiated).async {
             do {
-                let floatEmbeddings = try embeddingModel.generateDocumentEmbedding(for: text)
-                let doubleEmbeddings = floatEmbeddings.map { Double($0) }
-
-                DispatchQueue.main.async {
-                    completion(.success(doubleEmbeddings))
-                }
+                let e = try embeddingModel.generateDocumentEmbedding(for: text)
+                DispatchQueue.main.async { completion(.success(e.map { Double($0) })) }
             } catch {
-                DispatchQueue.main.async {
-                    completion(.failure(PigeonError(
-                        code: "DocumentEmbeddingGenerationFailed",
-                        message: "Failed to generate document embedding: \(error.localizedDescription)",
-                        details: nil
-                    )))
-                }
+                DispatchQueue.main.async { completion(.failure(PigeonError(code: "DocumentEmbeddingGenerationFailed", message: error.localizedDescription, details: nil))) }
             }
         }
+        #endif
     }
 
     func generateEmbeddingsFromModel(texts: [String], completion: @escaping (Result<[Any?], Error>) -> Void) {
-        print("[PLUGIN] Generating embeddings for \(texts.count) texts")
-
+        #if targetEnvironment(simulator)
+        completion(.failure(PigeonError(code: "SimulatorNotSupported", message: "Embeddings not supported on simulator", details: nil)))
+        #else
         guard let embeddingModel = embeddingModel else {
-            completion(.failure(PigeonError(
-                code: "EmbeddingModelNotInitialized",
-                message: "Embedding model not initialized. Call createEmbeddingModel first.",
-                details: nil
-            )))
+            completion(.failure(PigeonError(code: "EmbeddingModelNotInitialized", message: "Embedding model not initialized.", details: nil)))
             return
         }
-
         DispatchQueue.global(qos: .userInitiated).async {
             do {
                 var embeddings: [[Double]] = []
-                for text in texts {
-                    let floatEmbedding = try embeddingModel.generateEmbedding(for: text)
-                    embeddings.append(floatEmbedding.map { Double($0) })
-                }
-
-                DispatchQueue.main.async {
-                    print("[PLUGIN] Generated \(embeddings.count) embeddings")
-                    completion(.success(embeddings as [Any?]))
-                }
+                for text in texts { embeddings.append(try embeddingModel.generateEmbedding(for: text).map { Double($0) }) }
+                DispatchQueue.main.async { completion(.success(embeddings as [Any?])) }
             } catch {
-                DispatchQueue.main.async {
-                    print("[PLUGIN] Failed to generate embeddings: \(error)")
-                    completion(.failure(PigeonError(
-                        code: "EmbeddingGenerationFailed",
-                        message: "Failed to generate embeddings: \(error.localizedDescription)",
-                        details: nil
-                    )))
-                }
+                DispatchQueue.main.async { completion(.failure(PigeonError(code: "EmbeddingGenerationFailed", message: error.localizedDescription, details: nil))) }
             }
         }
+        #endif
     }
 
     func getEmbeddingDimension(completion: @escaping (Result<Int64, Error>) -> Void) {
-        print("[PLUGIN] Getting embedding dimension")
-
+        #if targetEnvironment(simulator)
+        completion(.failure(PigeonError(code: "SimulatorNotSupported", message: "Embeddings not supported on simulator", details: nil)))
+        #else
         guard let embeddingModel = embeddingModel else {
-            completion(.failure(PigeonError(
-                code: "EmbeddingModelNotInitialized",
-                message: "Embedding model not initialized. Call createEmbeddingModel first.",
-                details: nil
-            )))
+            completion(.failure(PigeonError(code: "EmbeddingModelNotInitialized", message: "Embedding model not initialized.", details: nil)))
             return
         }
-
         DispatchQueue.global(qos: .userInitiated).async {
             do {
-                let testEmbedding = try embeddingModel.generateEmbedding(for: "test")
-                let dimension = Int64(testEmbedding.count)
-
-                DispatchQueue.main.async {
-                    print("[PLUGIN] Embedding dimension: \(dimension)")
-                    completion(.success(dimension))
-                }
+                let dim = Int64(try embeddingModel.generateEmbedding(for: "test").count)
+                DispatchQueue.main.async { completion(.success(dim)) }
             } catch {
-                DispatchQueue.main.async {
-                    print("[PLUGIN] Failed to get embedding dimension: \(error)")
-                    completion(.failure(PigeonError(
-                        code: "EmbeddingDimensionFailed",
-                        message: "Failed to get embedding dimension: \(error.localizedDescription)",
-                        details: nil
-                    )))
-                }
+                DispatchQueue.main.async { completion(.failure(PigeonError(code: "EmbeddingDimensionFailed", message: error.localizedDescription, details: nil))) }
             }
         }
+        #endif
     }
     
     // MARK: - RAG VectorStore Methods (no-ops: VectorStore is now handled entirely in Dart via sqlite3)
